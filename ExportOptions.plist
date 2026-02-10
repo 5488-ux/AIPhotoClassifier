@@ -16,6 +16,10 @@
     <string>automatic</string>
     <key>signingCertificate</key>
     <string>Apple Development</string>
+    <key>stripSwiftSymbols</key>
+    <true/>
+    <key>thinning</key>
+    <string>&lt;none&gt;</string>
     <key>provisioningProfiles</key>
     <dict>
         <key>com.aiphoto.classifier</key>
