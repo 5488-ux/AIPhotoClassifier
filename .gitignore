@@ -98,3 +98,4 @@ iOSInjectionProject/
 # Secrets and API Keys
 Config.xcconfig
 Secrets.plist
+Config.plist

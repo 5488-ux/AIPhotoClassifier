@@ -3,9 +3,11 @@ import Foundation
 struct Constants {
     // MARK: - Claude API Configuration
     struct API {
-        static let key = "sk-wXcHTVlmF8UuMKLfdKcSAFkcug4ZDfKQGQkrRyHOq2ZM9Qo6"
+        // API密钥从Config.plist读取（不会上传到GitHub）
+        static var key: String { APIConfig.apiKey }
         static let model = "claude-haiku-4-5-20251001"
-        static let baseURL = "https://aicanapi.com/v1/messages"
+        // API基础URL从Config.plist读取
+        static var baseURL: String { APIConfig.baseURL }
         static let apiVersion = "2023-06-01"
         static let maxTokens = 300 // ~200 words
     }
