@@ -38,20 +38,20 @@ jobs:
         # 验证文件已创建
         ls -lh $CERTIFICATE_PATH $PP_PATH
 
-        # 创建密码文件（更可靠的方式）
-        echo "$CERTIFICATES_P12_PASSWORD" > $RUNNER_TEMP/cert_password.txt
+        # 验证证书文件（使用openssl）
+        openssl pkcs12 -in $CERTIFICATE_PATH -noout -passin pass:1 || openssl pkcs12 -in $CERTIFICATE_PATH -noout -passin pass: || echo "证书需要密码"
 
         # 创建临时钥匙串
         security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
         security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
         security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
 
-        # 导入证书 - 使用密码文件
-        security import $CERTIFICATE_PATH -P "$(cat $RUNNER_TEMP/cert_password.txt)" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-        security list-keychain -d user -s $KEYCHAIN_PATH
+        # 导入证书 - 尝试多种密码方式
+        security import $CERTIFICATE_PATH -P 1 -A -t cert -f pkcs12 -k $KEYCHAIN_PATH || \
+        security import $CERTIFICATE_PATH -P "" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH || \
+        security import $CERTIFICATE_PATH -P "$CERTIFICATES_P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
 
-        # 清理密码文件
-        rm -f $RUNNER_TEMP/cert_password.txt
+        security list-keychain -d user -s $KEYCHAIN_PATH
 
         # 安装Provisioning Profile
         mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
