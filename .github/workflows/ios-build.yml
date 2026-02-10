@@ -1,4 +1,4 @@
-name: iOS Build
+name: iOS Cloud Build (IPA)
 
 on:
   push:
@@ -6,9 +6,30 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      configuration:
+        description: '构建配置'
+        required: false
+        default: 'Release'
+        type: choice
+        options:
+          - Release
+          - Debug
+      include_dsym:
+        description: '包含 dSYM 调试符号'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  PROJECT_NAME: AIPhotoClassifier
+  SCHEME: AIPhotoClassifier
+  SDK: iphoneos
+  CONFIGURATION: ${{ github.event.inputs.configuration || 'Release' }}
 
 jobs:
-  build:
+  build-ipa:
+    name: Cloud Build IPA
     runs-on: macos-14
 
     steps:
@@ -20,89 +41,137 @@ jobs:
       with:
         xcode-version: '15.2'
 
-    - name: Show Xcode version
-      run: xcodebuild -version
-
-    - name: Build project
+    - name: Show build environment
       run: |
-        xcodebuild clean build \
-          -project AIPhotoClassifier.xcodeproj \
-          -scheme AIPhotoClassifier \
-          -sdk iphoneos \
-          -configuration Release \
+        echo "Xcode version:"
+        xcodebuild -version
+        echo ""
+        echo "Available SDKs:"
+        xcodebuild -showsdks | grep iphoneos
+        echo ""
+        echo "Build configuration: ${{ env.CONFIGURATION }}"
+
+    - name: Build and Archive
+      run: |
+        xcodebuild clean archive \
+          -project ${PROJECT_NAME}.xcodeproj \
+          -scheme ${SCHEME} \
+          -archivePath build/${PROJECT_NAME}.xcarchive \
+          -sdk ${SDK} \
+          -configuration ${{ env.CONFIGURATION }} \
+          -destination 'generic/platform=iOS' \
           CODE_SIGN_IDENTITY="" \
           CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_ALLOWED=NO \
+          ENABLE_BITCODE=NO
 
-    - name: Create Archive
+    - name: Create IPA from Archive
       run: |
-        xcodebuild archive \
-          -project AIPhotoClassifier.xcodeproj \
-          -scheme AIPhotoClassifier \
-          -archivePath build/AIPhotoClassifier.xcarchive \
-          -sdk iphoneos \
-          -configuration Release \
-          CODE_SIGN_IDENTITY="" \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO
+        set -euo pipefail
 
-    - name: Create ExportOptions.plist
+        ARCHIVE_PATH="build/${PROJECT_NAME}.xcarchive"
+        APP_PATH="${ARCHIVE_PATH}/Products/Applications/${PROJECT_NAME}.app"
+        IPA_DIR="build/ipa"
+
+        # 检查 .app 是否存在
+        if [ ! -d "${APP_PATH}" ]; then
+          echo "Error: .app not found at ${APP_PATH}"
+          echo "Searching for .app in archive..."
+          find "${ARCHIVE_PATH}" -name "*.app" -type d
+          exit 1
+        fi
+
+        echo "Found .app at: ${APP_PATH}"
+
+        # 创建 Payload 结构
+        mkdir -p "${IPA_DIR}/Payload"
+        cp -R "${APP_PATH}" "${IPA_DIR}/Payload/"
+
+        # 显示 app 信息
+        echo ""
+        echo "App Info:"
+        /usr/libexec/PlistBuddy -c "Print :CFBundleDisplayName" "${IPA_DIR}/Payload/${PROJECT_NAME}.app/Info.plist" 2>/dev/null || true
+        /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "${IPA_DIR}/Payload/${PROJECT_NAME}.app/Info.plist" 2>/dev/null || true
+        /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "${IPA_DIR}/Payload/${PROJECT_NAME}.app/Info.plist" 2>/dev/null || true
+
+        # 打包为 IPA (IPA 本质是一个 zip)
+        cd "${IPA_DIR}"
+        zip -r -q "../${PROJECT_NAME}.ipa" Payload/
+        cd -
+
+        # 清理临时 Payload
+        rm -rf "${IPA_DIR}/Payload"
+
+        # 验证 IPA
+        if [ -f "build/${PROJECT_NAME}.ipa" ]; then
+          IPA_SIZE=$(du -h "build/${PROJECT_NAME}.ipa" | cut -f1)
+          echo ""
+          echo "IPA created successfully!"
+          echo "  Path: build/${PROJECT_NAME}.ipa"
+          echo "  Size: ${IPA_SIZE}"
+        else
+          echo "Error: IPA creation failed"
+          exit 1
+        fi
+
+    - name: Extract dSYM
+      if: ${{ github.event.inputs.include_dsym != 'false' }}
       run: |
-        cat > ExportOptions.plist << EOF
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>method</key>
-            <string>development</string>
-            <key>compileBitcode</key>
-            <false/>
-        </dict>
-        </plist>
-        EOF
+        DSYM_PATH="build/${PROJECT_NAME}.xcarchive/dSYMs"
+        if [ -d "${DSYM_PATH}" ] && [ "$(ls -A ${DSYM_PATH} 2>/dev/null)" ]; then
+          cd build
+          zip -r -q "${PROJECT_NAME}-dSYMs.zip" "${PROJECT_NAME}.xcarchive/dSYMs/"
+          echo "dSYM archive created: build/${PROJECT_NAME}-dSYMs.zip"
+          cd -
+        else
+          echo "No dSYM files found (may be normal for unsigned builds)"
+        fi
 
-    - name: Export IPA (Optional - requires signing)
-      continue-on-error: true
-      run: |
-        xcodebuild -exportArchive \
-          -archivePath build/AIPhotoClassifier.xcarchive \
-          -exportPath build \
-          -exportOptionsPlist ExportOptions.plist || echo "⚠️  IPA export skipped (no signing certificates)"
-
-    - name: Upload Archive (Always)
+    - name: Upload IPA
       uses: actions/upload-artifact@v4
-      if: always()
       with:
-        name: AIPhotoClassifier-Archive
-        path: build/AIPhotoClassifier.xcarchive
+        name: ${{ env.PROJECT_NAME }}-IPA
+        path: build/${{ env.PROJECT_NAME }}.ipa
         retention-days: 30
 
-    - name: Upload IPA (if exists)
+    - name: Upload Archive
       uses: actions/upload-artifact@v4
-      if: success()
       with:
-        name: AIPhotoClassifier-IPA
-        path: build/*.ipa
+        name: ${{ env.PROJECT_NAME }}-Archive
+        path: build/${{ env.PROJECT_NAME }}.xcarchive
+        retention-days: 15
+
+    - name: Upload dSYMs
+      if: ${{ github.event.inputs.include_dsym != 'false' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.PROJECT_NAME }}-dSYMs
+        path: build/${{ env.PROJECT_NAME }}-dSYMs.zip
         retention-days: 30
         if-no-files-found: ignore
 
     - name: Build Summary
       if: always()
       run: |
-        echo "## 🎉 Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "## AIPhotoClassifier Cloud Build" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "✅ **Build Status**: Success" >> $GITHUB_STEP_SUMMARY
-        echo "✅ **Archive Created**: build/AIPhotoClassifier.xcarchive" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        if [ -f "build/*.ipa" ]; then
-          echo "✅ **IPA Generated**: Yes" >> $GITHUB_STEP_SUMMARY
+
+        if [ -f "build/${PROJECT_NAME}.ipa" ]; then
+          IPA_SIZE=$(du -h "build/${PROJECT_NAME}.ipa" | cut -f1)
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Status | Success |" >> $GITHUB_STEP_SUMMARY
+          echo "| Configuration | ${{ env.CONFIGURATION }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| IPA Size | ${IPA_SIZE} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Signing | Unsigned |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Download" >> $GITHUB_STEP_SUMMARY
+          echo "- **${PROJECT_NAME}-IPA**: Download from Artifacts section below" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Install (unsigned IPA)" >> $GITHUB_STEP_SUMMARY
+          echo "1. **AltStore**: Import IPA via AltStore" >> $GITHUB_STEP_SUMMARY
+          echo "2. **Sideloadly**: Drag IPA into Sideloadly" >> $GITHUB_STEP_SUMMARY
+          echo "3. **Re-sign**: Use iOS App Signer to re-sign, then install via Xcode" >> $GITHUB_STEP_SUMMARY
         else
-          echo "⚠️  **IPA Generated**: No (requires signing certificates)" >> $GITHUB_STEP_SUMMARY
+          echo "Build failed - no IPA generated" >> $GITHUB_STEP_SUMMARY
         fi
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 📦 Download Artifacts" >> $GITHUB_STEP_SUMMARY
-        echo "- **AIPhotoClassifier-Archive**: Xcode archive file" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 💡 Note" >> $GITHUB_STEP_SUMMARY
-        echo "IPA generation requires Apple Developer certificates." >> $GITHUB_STEP_SUMMARY
-        echo "The archive can be opened in Xcode and run on simulators/devices." >> $GITHUB_STEP_SUMMARY

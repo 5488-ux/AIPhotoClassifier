@@ -1,13 +1,40 @@
-name: iOS Build (Signed - IPA)
+name: iOS Cloud Build (Signed IPA)
 
 on:
-  workflow_dispatch:  # 手动触发
+  workflow_dispatch:
+    inputs:
+      export_method:
+        description: '导出方式'
+        required: false
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - ad-hoc
+          - app-store
+      configuration:
+        description: '构建配置'
+        required: false
+        default: 'Release'
+        type: choice
+        options:
+          - Release
+          - Debug
   push:
     tags:
-      - 'v*'  # 当推送版本tag时触发
+      - 'v*'
+
+env:
+  PROJECT_NAME: AIPhotoClassifier
+  SCHEME: AIPhotoClassifier
+  SDK: iphoneos
+  BUNDLE_ID: com.aiphoto.classifier
+  CONFIGURATION: ${{ github.event.inputs.configuration || 'Release' }}
+  EXPORT_METHOD: ${{ github.event.inputs.export_method || 'development' }}
 
 jobs:
   build-signed:
+    name: Signed IPA (${{ github.event.inputs.export_method || 'development' }})
     runs-on: macos-14
 
     steps:
@@ -19,6 +46,14 @@ jobs:
       with:
         xcode-version: '15.2'
 
+    - name: Show build environment
+      run: |
+        echo "Xcode version:"
+        xcodebuild -version
+        echo ""
+        echo "Configuration: ${{ env.CONFIGURATION }}"
+        echo "Export method: ${{ env.EXPORT_METHOD }}"
+
     - name: Install Apple Certificate and Provisioning Profile
       env:
         CERTIFICATES_P12: ${{ secrets.CERTIFICATES_P12 }}
@@ -26,12 +61,12 @@ jobs:
         PROVISIONING_PROFILE: ${{ secrets.PROVISIONING_PROFILE }}
         KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
       run: |
-        # 创建临时目录
+        # 创建临时路径
         CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
         PP_PATH=$RUNNER_TEMP/profile.mobileprovision
         KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
 
-        # 解码证书和Profile
+        # 解码证书和 Provisioning Profile
         echo -n "$CERTIFICATES_P12" | base64 --decode -o $CERTIFICATE_PATH
         echo -n "$PROVISIONING_PROFILE" | base64 --decode -o $PP_PATH
 
@@ -42,13 +77,15 @@ jobs:
 
         # 导入证书
         security import $CERTIFICATE_PATH -P "$CERTIFICATES_P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+        security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
         security list-keychain -d user -s $KEYCHAIN_PATH
 
-        # 安装Provisioning Profile
+        # 安装 Provisioning Profile
         mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
         cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
 
         # 显示已安装的证书
+        echo "Installed certificates:"
         security find-identity -v -p codesigning
 
     - name: Build and Archive
@@ -56,100 +93,145 @@ jobs:
         TEAM_ID: ${{ secrets.TEAM_ID }}
       run: |
         xcodebuild clean archive \
-          -project AIPhotoClassifier.xcodeproj \
-          -scheme AIPhotoClassifier \
-          -archivePath $RUNNER_TEMP/AIPhotoClassifier.xcarchive \
-          -sdk iphoneos \
-          -configuration Release \
+          -project ${PROJECT_NAME}.xcodeproj \
+          -scheme ${SCHEME} \
+          -archivePath $RUNNER_TEMP/${PROJECT_NAME}.xcarchive \
+          -sdk ${SDK} \
+          -configuration ${{ env.CONFIGURATION }} \
           -destination 'generic/platform=iOS' \
-          CODE_SIGN_STYLE=Manual \
+          CODE_SIGN_STYLE=Automatic \
           DEVELOPMENT_TEAM=$TEAM_ID \
-          CODE_SIGN_IDENTITY="Apple Development" \
-          PROVISIONING_PROFILE_SPECIFIER=""
+          ENABLE_BITCODE=NO
 
     - name: Export IPA
+      env:
+        TEAM_ID: ${{ secrets.TEAM_ID }}
       run: |
-        # 创建ExportOptions.plist
-        cat > $RUNNER_TEMP/ExportOptions.plist << EOF
+        # 根据导出方式选择签名证书
+        if [ "${{ env.EXPORT_METHOD }}" = "app-store" ]; then
+          SIGNING_CERT="Apple Distribution"
+        else
+          SIGNING_CERT="Apple Development"
+        fi
+
+        # 生成 ExportOptions.plist
+        cat > $RUNNER_TEMP/ExportOptions.plist << PLIST
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
         <dict>
             <key>method</key>
-            <string>development</string>
+            <string>${{ env.EXPORT_METHOD }}</string>
             <key>teamID</key>
-            <string>${{ secrets.TEAM_ID }}</string>
+            <string>${TEAM_ID}</string>
             <key>uploadBitcode</key>
             <false/>
             <key>compileBitcode</key>
             <false/>
             <key>signingStyle</key>
-            <string>manual</string>
-            <key>signingCertificate</key>
-            <string>Apple Development</string>
-            <key>provisioningProfiles</key>
-            <dict>
-                <key>com.aiphoto.classifier</key>
-                <string>match Development com.aiphoto.classifier</string>
-            </dict>
+            <string>automatic</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>thinning</key>
+            <string>&lt;none&gt;</string>
         </dict>
         </plist>
-        EOF
+        PLIST
 
-        # 导出IPA
+        # 导出 IPA
         xcodebuild -exportArchive \
-          -archivePath $RUNNER_TEMP/AIPhotoClassifier.xcarchive \
+          -archivePath $RUNNER_TEMP/${PROJECT_NAME}.xcarchive \
           -exportPath $RUNNER_TEMP/build \
           -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist
 
-        # 移动到build目录
+        # 移动到 build 目录
         mkdir -p build
-        cp $RUNNER_TEMP/build/AIPhotoClassifier.ipa build/
+        cp $RUNNER_TEMP/build/${PROJECT_NAME}.ipa build/
+
+        # 显示 IPA 信息
+        if [ -f "build/${PROJECT_NAME}.ipa" ]; then
+          IPA_SIZE=$(du -h "build/${PROJECT_NAME}.ipa" | cut -f1)
+          echo "IPA created: build/${PROJECT_NAME}.ipa (${IPA_SIZE})"
+        fi
+
+    - name: Package dSYMs
+      run: |
+        DSYM_PATH="$RUNNER_TEMP/${PROJECT_NAME}.xcarchive/dSYMs"
+        if [ -d "${DSYM_PATH}" ] && [ "$(ls -A ${DSYM_PATH} 2>/dev/null)" ]; then
+          cd $RUNNER_TEMP
+          zip -r -q "${PROJECT_NAME}-dSYMs.zip" "${PROJECT_NAME}.xcarchive/dSYMs/"
+          cp "${PROJECT_NAME}-dSYMs.zip" $GITHUB_WORKSPACE/build/
+          cd -
+          echo "dSYM archive created"
+        fi
 
     - name: Upload IPA
       uses: actions/upload-artifact@v4
       with:
-        name: AIPhotoClassifier-IPA-Signed
-        path: build/AIPhotoClassifier.ipa
+        name: ${{ env.PROJECT_NAME }}-IPA-Signed
+        path: build/${{ env.PROJECT_NAME }}.ipa
         retention-days: 30
+
+    - name: Upload dSYMs
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.PROJECT_NAME }}-dSYMs
+        path: build/${{ env.PROJECT_NAME }}-dSYMs.zip
+        retention-days: 30
+        if-no-files-found: ignore
 
     - name: Upload Archive
       uses: actions/upload-artifact@v4
       with:
-        name: AIPhotoClassifier-Archive-Signed
-        path: ${{ runner.temp }}/AIPhotoClassifier.xcarchive
-        retention-days: 30
+        name: ${{ env.PROJECT_NAME }}-Archive-Signed
+        path: ${{ runner.temp }}/${{ env.PROJECT_NAME }}.xcarchive
+        retention-days: 15
 
     - name: Cleanup
       if: always()
       run: |
-        # 删除临时钥匙串
         security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
-        # 删除临时文件
         rm -rf $RUNNER_TEMP/certificate.p12
         rm -rf $RUNNER_TEMP/profile.mobileprovision
         rm -rf ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision
 
     - name: Build Summary
-      if: success()
+      if: always()
       run: |
-        echo "## 🎉 签名构建成功！" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "✅ **IPA已生成**: build/AIPhotoClassifier.ipa" >> $GITHUB_STEP_SUMMARY
-        echo "✅ **签名类型**: Development" >> $GITHUB_STEP_SUMMARY
-        echo "✅ **Team ID**: ${{ secrets.TEAM_ID }}" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 📦 下载" >> $GITHUB_STEP_SUMMARY
-        echo "在Artifacts中下载 **AIPhotoClassifier-IPA-Signed**" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 📱 安装方法" >> $GITHUB_STEP_SUMMARY
-        echo "1. 使用Xcode: Window → Devices → 拖入IPA" >> $GITHUB_STEP_SUMMARY
-        echo "2. 使用AltStore/Sideloadly" >> $GITHUB_STEP_SUMMARY
-        echo "3. 通过TestFlight分发" >> $GITHUB_STEP_SUMMARY
+        echo "## AIPhotoClassifier Signed Build" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
 
-        # 显示IPA文件信息
-        if [ -f "build/AIPhotoClassifier.ipa" ]; then
-          echo "### 📊 IPA信息" >> $GITHUB_STEP_SUMMARY
-          ls -lh build/AIPhotoClassifier.ipa | awk '{print "**大小**: " $5}' >> $GITHUB_STEP_SUMMARY
+        if [ -f "build/${PROJECT_NAME}.ipa" ]; then
+          IPA_SIZE=$(du -h "build/${PROJECT_NAME}.ipa" | cut -f1)
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Status | Success |" >> $GITHUB_STEP_SUMMARY
+          echo "| Configuration | ${{ env.CONFIGURATION }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Export Method | ${{ env.EXPORT_METHOD }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| IPA Size | ${IPA_SIZE} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Team ID | ${{ secrets.TEAM_ID }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Download" >> $GITHUB_STEP_SUMMARY
+          echo "Download **${PROJECT_NAME}-IPA-Signed** from Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Install" >> $GITHUB_STEP_SUMMARY
+          echo "1. **Xcode**: Window -> Devices and Simulators -> drag IPA" >> $GITHUB_STEP_SUMMARY
+          echo "2. **Apple Configurator 2**: Add -> Apps -> select IPA" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ env.EXPORT_METHOD }}" = "app-store" ]; then
+            echo "3. **Transporter**: Upload to App Store Connect" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "3. **AltStore / Sideloadly**: Direct install" >> $GITHUB_STEP_SUMMARY
+          fi
+        else
+          echo "Build failed - check logs for details" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Required Secrets" >> $GITHUB_STEP_SUMMARY
+          echo "Make sure these are configured in Settings -> Secrets:" >> $GITHUB_STEP_SUMMARY
+          echo "- \`CERTIFICATES_P12\`: Base64-encoded .p12 certificate" >> $GITHUB_STEP_SUMMARY
+          echo "- \`CERTIFICATES_P12_PASSWORD\`: Certificate password" >> $GITHUB_STEP_SUMMARY
+          echo "- \`PROVISIONING_PROFILE\`: Base64-encoded .mobileprovision" >> $GITHUB_STEP_SUMMARY
+          echo "- \`KEYCHAIN_PASSWORD\`: Temp keychain password (any string)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`TEAM_ID\`: Apple Developer Team ID" >> $GITHUB_STEP_SUMMARY
         fi
