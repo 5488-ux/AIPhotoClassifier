@@ -3,9 +3,9 @@ import Foundation
 struct Constants {
     // MARK: - Claude API Configuration
     struct API {
-        static let key = "sk-aDNuLw9dfI77QFy3pTT8Hehtkg26VnaydPC9Rpvpm6a29UF1"
+        static let key = "sk-wXcHTVlmF8UuMKLfdKcSAFkcug4ZDfKQGQkrRyHOq2ZM9Qo6"
         static let model = "claude-haiku-4-5-20251001"
-        static let baseURL = "https://api.anthropic.com/v1/messages"
+        static let baseURL = "https://aicanapi.com/v1/messages"
         static let apiVersion = "2023-06-01"
         static let maxTokens = 300 // ~200 words
     }
