@@ -1,13 +1,19 @@
 import Foundation
 
 struct Constants {
-    // MARK: - Claude API Configuration
+    // MARK: - API Configuration (aicanapi.com proxy, OpenAI-compatible)
     struct API {
         static let key = "sk-aDNuLw9dfI77QFy3pTT8Hehtkg26VnaydPC9Rpvpm6a29UF1"
+        static let baseURL = "https://aicanapi.com/v1/chat/completions"
         static let model = "claude-haiku-4-5-20251001"
-        static let baseURL = "https://api.anthropic.com/v1/messages"
-        static let apiVersion = "2023-06-01"
-        static let maxTokens = 300 // ~200 words
+        static let thinkingModel = "claude-haiku-4-5-20251001-thinking"
+        static let maxTokens = 300
+        static let maxContextMessages = 20
+        static let systemPrompt = "你是 AI Photo Classifier 的智能助手，帮助用户管理和分类照片。用中文回答，简洁友好。"
+
+        // Video generation
+        static let videoURL = "https://aicanapi.com/v1/video/generations"
+        static let videoModel = "grok-video-3"
     }
 
     // MARK: - App Configuration
