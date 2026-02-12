@@ -38,7 +38,7 @@ class AIChatViewModel: ObservableObject {
 
         do {
             let (response, thinking) = try await ClaudeAPIService.shared.chat(
-                message: currentInput,
+                messages: messages,
                 thinkingEnabled: thinkingEnabled
             )
 

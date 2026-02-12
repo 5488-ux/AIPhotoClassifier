@@ -16,7 +16,7 @@ struct APIConfig {
         if let url = readConfigValue(for: "APIBaseURL") {
             return url
         }
-        return "https://aicanapi.com/v1/messages"
+        return "https://aicanapi.com/v1/chat/completions"
     }
 
     /// 读取配置文件中的值

@@ -1,15 +1,15 @@
 import Foundation
 
 struct Constants {
-    // MARK: - Claude API Configuration
+    // MARK: - Claude API Configuration (OpenAI兼容格式，通过aicanapi.com代理)
     struct API {
-        // 注意：此API密钥已配置为中转服务
-        // 生产环境建议使用Config.plist配置（参考API_CONFIG_README.md）
         static let key = "sk-wXcHTVlmF8UuMKLfdKcSAFkcug4ZDfKQGQkrRyHOq2ZM9Qo6"
         static let model = "claude-haiku-4-5-20251001"
-        static let baseURL = "https://aicanapi.com/v1/messages"
-        static let apiVersion = "2023-06-01"
-        static let maxTokens = 300 // ~200 words
+        static let thinkingModel = "claude-haiku-4-5-20251001-thinking"
+        static let baseURL = "https://aicanapi.com/v1/chat/completions"
+        static let maxTokens = 300
+        static let maxContextMessages = 20
+        static let systemPrompt = "你是AI照片分类助手，帮助用户管理和分类照片。请用中文简洁回复。"
     }
 
     // MARK: - App Configuration
