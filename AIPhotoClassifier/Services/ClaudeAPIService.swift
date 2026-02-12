@@ -27,16 +27,40 @@ class ClaudeAPIService {
     private init() {}
 
     // MARK: - Image Analysis for Classification
+    private let batchSize = 5
+
     func analyzeImages(_ images: [UIImage]) async throws -> [String: [Int]] {
+        // Process in batches to avoid payload too large
+        if images.count <= batchSize {
+            return try await analyzeImageBatch(images, offset: 0)
+        }
+
+        var merged: [String: [Int]] = [:]
+        var offset = 0
+        for batchStart in stride(from: 0, to: images.count, by: batchSize) {
+            let batchEnd = min(batchStart + batchSize, images.count)
+            let batch = Array(images[batchStart..<batchEnd])
+            let result = try await analyzeImageBatch(batch, offset: offset)
+            for (category, indices) in result {
+                merged[category, default: []].append(contentsOf: indices)
+            }
+            offset += batch.count
+        }
+        return merged
+    }
+
+    private func analyzeImageBatch(_ images: [UIImage], offset: Int) async throws -> [String: [Int]] {
         var parts: [OpenAIChatRequest.ContentPart] = []
 
         for image in images {
-            if let base64 = image.toBase64() {
+            if let base64 = image.toBase64ForAPI() {
                 parts.append(.imagePart(base64Data: base64))
             }
         }
 
-        parts.append(.textPart(Constants.Classification.classificationPrompt))
+        let prompt = Constants.Classification.classificationPrompt
+            + "\n图片编号从\(offset)开始,共\(images.count)张(编号\(offset)到\(offset + images.count - 1))。"
+        parts.append(.textPart(prompt))
 
         let messages: [OpenAIChatRequest.ChatMessage] = [
             .init(role: "user", content: .parts(parts))
@@ -48,7 +72,7 @@ class ClaudeAPIService {
             max_tokens: 1024
         )
 
-        let response = try await sendRequest(request)
+        let response = try await sendRequest(request, timeout: 120)
         guard let text = response.choices.first?.message.content, !text.isEmpty else {
             throw ClaudeAPIError.emptyResponse
         }
@@ -90,7 +114,7 @@ class ClaudeAPIService {
     }
 
     // MARK: - Private Methods
-    private func sendRequest(_ request: OpenAIChatRequest) async throws -> OpenAIChatResponse {
+    private func sendRequest(_ request: OpenAIChatRequest, timeout: TimeInterval = 60) async throws -> OpenAIChatResponse {
         guard let url = URL(string: Constants.API.baseURL) else {
             throw ClaudeAPIError.invalidURL
         }
@@ -99,7 +123,7 @@ class ClaudeAPIService {
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("Bearer \(Constants.API.key)", forHTTPHeaderField: "Authorization")
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        urlRequest.timeoutInterval = 60
+        urlRequest.timeoutInterval = timeout
 
         urlRequest.httpBody = try JSONEncoder().encode(request)
 

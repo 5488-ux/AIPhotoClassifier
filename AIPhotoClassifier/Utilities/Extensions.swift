@@ -4,10 +4,6 @@ import CryptoKit
 
 // MARK: - Data Extensions
 extension Data {
-    func base64EncodedString() -> String {
-        return self.base64EncodedString()
-    }
-
     func sha256Hash() -> String {
         let hash = SHA256.hash(data: self)
         return hash.compactMap { String(format: "%02x", $0) }.joined()
@@ -36,8 +32,23 @@ extension UIImage {
         return imageData.base64EncodedString()
     }
 
+    /// Resize for API analysis: max 1024px on longest side, JPEG quality 0.6
+    func toBase64ForAPI(maxDimension: CGFloat = 1024, quality: CGFloat = 0.6) -> String? {
+        let resized = resizedToFit(maxDimension: maxDimension) ?? self
+        guard let data = resized.jpegData(compressionQuality: quality) else { return nil }
+        return data.base64EncodedString()
+    }
+
+    func resizedToFit(maxDimension: CGFloat) -> UIImage? {
+        let maxSide = max(size.width, size.height)
+        guard maxSide > maxDimension else { return self }
+        let scale = maxDimension / maxSide
+        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+        return resized(to: newSize)
+    }
+
     func resized(to size: CGSize) -> UIImage? {
-        UIGraphicsBeginImageContextWithOptions(size, false, scale)
+        UIGraphicsBeginImageContextWithOptions(size, false, 1.0)
         defer { UIGraphicsEndImageContext() }
         draw(in: CGRect(origin: .zero, size: size))
         return UIGraphicsGetImageFromCurrentImageContext()
