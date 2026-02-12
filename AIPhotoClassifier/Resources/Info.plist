@@ -33,7 +33,7 @@
     <dict/>
     <key>UIRequiredDeviceCapabilities</key>
     <array>
-        <string>armv7</string>
+        <string>arm64</string>
     </array>
     <key>UISupportedInterfaceOrientations</key>
     <array>
@@ -48,17 +48,28 @@
         <string>UIInterfaceOrientationLandscapeLeft</string>
         <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
-
-    <!-- Privacy Permissions -->
     <key>NSFaceIDUsageDescription</key>
     <string>我们需要使用Face ID来保护您的照片隐私和应用安全</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>我们需要访问您的照片库以便上传和管理照片</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>我们需要保存照片到您的照片库</string>
-
-    <!-- Minimum iOS Version -->
     <key>MinimumOSVersion</key>
     <string>16.0</string>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <false/>
+        <key>NSExceptionDomains</key>
+        <dict>
+            <key>aicanapi.com</key>
+            <dict>
+                <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                <false/>
+                <key>NSIncludesSubdomains</key>
+                <true/>
+            </dict>
+        </dict>
+    </dict>
 </dict>
 </plist>
