@@ -4,10 +4,6 @@ import CryptoKit
 
 // MARK: - Data Extensions
 extension Data {
-    func base64EncodedString() -> String {
-        return self.base64EncodedString()
-    }
-
     func sha256Hash() -> String {
         let hash = SHA256.hash(data: self)
         return hash.compactMap { String(format: "%02x", $0) }.joined()
@@ -33,7 +29,7 @@ extension String {
 extension UIImage {
     func toBase64() -> String? {
         guard let imageData = self.jpegData(compressionQuality: 0.8) else { return nil }
-        return imageData.base64EncodedString()
+        return imageData.base64EncodedString(options: [])
     }
 
     func resized(to size: CGSize) -> UIImage? {
@@ -80,7 +76,7 @@ extension Color {
 
 // MARK: - Date Extensions
 extension Date {
-    func formatted() -> String {
+    func formattedString() -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
@@ -91,7 +87,7 @@ extension Date {
 
 // MARK: - SymmetricKey Extensions
 extension SymmetricKey {
-    init?(data: Data) {
+    init?(validatedData data: Data) {
         guard data.count == SymmetricKeySize.bits256.bitCount / 8 else { return nil }
         self.init(data: data)
     }

@@ -49,7 +49,7 @@ struct MessageBubbleView: View {
                         )
                         .cornerRadius(16)
 
-                    Text(message.timestamp.formatted())
+                    Text(message.timestamp.formattedString())
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }

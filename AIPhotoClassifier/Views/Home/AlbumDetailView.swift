@@ -191,7 +191,7 @@ struct AlbumSettingsView: View {
                     Text("名称: \(viewModel.album.name)")
                     Text("分类: \(viewModel.album.category)")
                     Text("照片数量: \(viewModel.photos.count)")
-                    Text("创建时间: \(viewModel.album.createdAt.formatted())")
+                    Text("创建时间: \(viewModel.album.createdAt.formattedString())")
                 }
 
                 Section("加密设置") {

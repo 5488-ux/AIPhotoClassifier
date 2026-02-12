@@ -220,7 +220,7 @@ class ClaudeAPIService {
 
     private func parseClassificationResponse(_ jsonString: String) throws -> [String: [Int]] {
         // Extract JSON from response (handle markdown code blocks)
-        var cleanJSON = jsonString
+        let cleanJSON = jsonString
             .replacingOccurrences(of: "```json", with: "")
             .replacingOccurrences(of: "```", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
