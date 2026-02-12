@@ -19,7 +19,7 @@ class EncryptionService {
     func getMasterKey() throws -> SymmetricKey {
         // Try to retrieve existing key from Keychain
         if let keyData = try? retrieveKeyFromKeychain() {
-            if let key = SymmetricKey(data: keyData) {
+            if let key = SymmetricKey.validated(from: keyData) {
                 return key
             }
         }

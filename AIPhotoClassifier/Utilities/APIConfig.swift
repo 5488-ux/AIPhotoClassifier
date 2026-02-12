@@ -2,13 +2,12 @@ import Foundation
 
 /// API配置管理 - 从本地配置文件读取敏感信息
 struct APIConfig {
-    /// 从Config.plist读取API密钥
+    /// 从Config.plist读取API密钥，未配置时回退到Constants中的默认值
     static var apiKey: String {
         if let key = readConfigValue(for: "APIKey") {
             return key
         }
-        // 如果没有配置文件，使用默认值（需要用户自行配置）
-        fatalError("❌ API密钥未配置！请在Config.plist中设置APIKey")
+        return Constants.API.key
     }
 
     /// 从Config.plist读取API基础URL

@@ -34,6 +34,7 @@ struct ImagePicker: UIViewControllerRepresentable {
             guard !results.isEmpty else { return }
 
             let dispatchGroup = DispatchGroup()
+            let lock = NSLock()
             var images: [UIImage] = []
 
             for result in results {
@@ -43,7 +44,9 @@ struct ImagePicker: UIViewControllerRepresentable {
                     defer { dispatchGroup.leave() }
 
                     if let image = object as? UIImage {
+                        lock.lock()
                         images.append(image)
+                        lock.unlock()
                     }
                 }
             }

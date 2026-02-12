@@ -102,9 +102,11 @@ extension Date {
 
 // MARK: - SymmetricKey Extensions
 extension SymmetricKey {
-    init?(data: Data) {
-        guard data.count == SymmetricKeySize.bits256.bitCount / 8 else { return nil }
-        self.init(data: data)
+    /// Validate data length before creating a key. Uses a different parameter
+    /// name to avoid infinite recursion with self.init(data:).
+    static func validated(from keyData: Data) -> SymmetricKey? {
+        guard keyData.count == SymmetricKeySize.bits256.bitCount / 8 else { return nil }
+        return SymmetricKey(data: keyData)
     }
 
     var dataRepresentation: Data {
