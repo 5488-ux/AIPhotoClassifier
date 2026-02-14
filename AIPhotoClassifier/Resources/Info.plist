@@ -55,7 +55,7 @@
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>我们需要保存照片到您的照片库</string>
     <key>MinimumOSVersion</key>
-    <string>16.0</string>
+    <string>26.0</string>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsArbitraryLoads</key>

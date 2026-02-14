@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-struct Album: Identifiable, Codable {
+struct Album: Identifiable, Codable, Hashable {
     let id: UUID
     var name: String
     var category: String

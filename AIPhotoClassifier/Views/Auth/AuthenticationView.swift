@@ -6,6 +6,8 @@ struct AuthenticationView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var isAuthenticating = false
+    @State private var logoScale: CGFloat = 0.6
+    @State private var logoOpacity: Double = 0
 
     var onAuthenticated: () -> Void
 
@@ -18,50 +20,54 @@ struct AuthenticationView: View {
             )
             .ignoresSafeArea()
 
-            VStack(spacing: 30) {
+            VStack(spacing: 32) {
                 Spacer()
 
                 // App Icon
-                Image(systemName: "photo.stack.fill")
-                    .font(.system(size: 100))
-                    .foregroundColor(.white)
+                VStack(spacing: 18) {
+                    Image(systemName: "photo.stack.fill")
+                        .font(.system(size: 88))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.white)
+                        .scaleEffect(logoScale)
+                        .opacity(logoOpacity)
 
-                Text("AI Photo Classifier")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
+                    Text("AI Photo Classifier")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
 
-                Text("智能图片分类管理")
-                    .font(.title3)
-                    .foregroundColor(.white.opacity(0.9))
+                    Text("智能图片分类管理")
+                        .font(.title3)
+                        .foregroundStyle(.white.opacity(0.85))
+                }
 
                 Spacer()
 
                 // Authentication Button
-                VStack(spacing: 15) {
+                VStack(spacing: 16) {
                     Button(action: authenticate) {
-                        HStack {
-                            Image(systemName: getBiometryIcon())
-                                .font(.title2)
+                        HStack(spacing: 10) {
+                            if isAuthenticating {
+                                ProgressView()
+                                    .tint(.appPrimary)
+                            } else {
+                                Image(systemName: getBiometryIcon())
+                                    .font(.title2)
+                            }
 
                             Text("使用\(authService.getBiometryTypeString())解锁")
                                 .font(.headline)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.white)
-                        .foregroundColor(Color.appPrimary)
-                        .cornerRadius(15)
+                        .padding(.vertical, 16)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                        .foregroundStyle(.appPrimary)
                     }
                     .disabled(isAuthenticating)
-
-                    if isAuthenticating {
-                        ProgressView()
-                            .tint(.white)
-                    }
                 }
                 .padding(.horizontal, 40)
-                .padding(.bottom, 50)
+                .padding(.bottom, 60)
             }
         }
         .alert("认证失败", isPresented: $showError) {
@@ -71,9 +77,12 @@ struct AuthenticationView: View {
             Text(errorMessage)
         }
         .onAppear {
-            // Auto-trigger authentication on appear
+            withAnimation(.spring(duration: 0.8)) {
+                logoScale = 1.0
+                logoOpacity = 1.0
+            }
             Task {
-                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second delay
+                try? await Task.sleep(nanoseconds: 600_000_000)
                 authenticate()
             }
         }

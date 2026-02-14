@@ -35,7 +35,7 @@ env:
 jobs:
   build-signed:
     name: Signed IPA (${{ github.event.inputs.export_method || 'development' }})
-    runs-on: macos-14
+    runs-on: macos-15
 
     steps:
     - name: Checkout repository
@@ -44,7 +44,7 @@ jobs:
     - name: Setup Xcode
       uses: maxim-lobanov/setup-xcode@v1
       with:
-        xcode-version: '15.2'
+        xcode-version: latest-stable
 
     - name: Show build environment
       run: |

@@ -6,9 +6,8 @@ struct AIChatView: View {
     @FocusState private var isInputFocused: Bool
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
-                // Messages List
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 12) {
@@ -18,22 +17,20 @@ struct AIChatView: View {
                             }
 
                             if viewModel.isLoading {
-                                HStack {
+                                HStack(spacing: 10) {
                                     ProgressView()
-                                        .padding(.horizontal)
-
-                                    Text("AI正在思考...")
-                                        .foregroundColor(.secondary)
+                                    Text("AI 正在思考...")
+                                        .foregroundStyle(.secondary)
                                         .font(.caption)
-
                                     Spacer()
                                 }
-                                .padding()
+                                .padding(.horizontal)
                             }
                         }
                         .padding()
                     }
-                    .onChange(of: viewModel.messages.count) { _ in
+                    .scrollDismissesKeyboard(.interactively)
+                    .onChange(of: viewModel.messages.count) {
                         if let lastMessage = viewModel.messages.last {
                             withAnimation {
                                 proxy.scrollTo(lastMessage.id, anchor: .bottom)
@@ -44,39 +41,38 @@ struct AIChatView: View {
 
                 Divider()
 
-                // Input Area
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
                     TextField("输入消息...", text: $viewModel.inputText, axis: .vertical)
-                        .textFieldStyle(.roundedBorder)
                         .lineLimit(1...5)
                         .focused($isInputFocused)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(.bar)
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
 
                     Button(action: sendMessage) {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.title2)
-                            .foregroundColor(viewModel.inputText.isEmpty ? .gray : .appPrimary)
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(viewModel.inputText.isEmpty ? .gray : .appPrimary)
                     }
                     .disabled(viewModel.inputText.isEmpty || viewModel.isLoading)
                 }
-                .padding()
-                .background(Color.appSecondaryBackground)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial)
             }
             .navigationTitle("AI 助手")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("关闭") {
-                        dismiss()
-                    }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("关闭") { dismiss() }
                 }
-
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Toggle("显示思考过程", isOn: $viewModel.showThinking)
                         Toggle("启用思考模式", isOn: $viewModel.thinkingEnabled)
-
                         Divider()
-
                         Button(role: .destructive, action: viewModel.clearHistory) {
                             Label("清空历史", systemImage: "trash")
                         }
@@ -86,14 +82,10 @@ struct AIChatView: View {
                 }
             }
         }
-        .onAppear {
-            isInputFocused = true
-        }
+        .onAppear { isInputFocused = true }
     }
 
     private func sendMessage() {
-        Task {
-            await viewModel.sendMessage()
-        }
+        Task { await viewModel.sendMessage() }
     }
 }

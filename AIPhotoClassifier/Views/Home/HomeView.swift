@@ -7,10 +7,10 @@ struct HomeView: View {
     @State private var selectedImages: [UIImage] = []
     @State private var showCreateAlbum = false
 
-    let columns = Array(repeating: GridItem(.flexible(), spacing: 15), count: 2)
+    let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 2)
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 if viewModel.albums.isEmpty {
                     emptyStateView
@@ -19,30 +19,23 @@ struct HomeView: View {
                 }
 
                 if viewModel.isLoading {
-                    Color.black.opacity(0.3)
-                        .ignoresSafeArea()
-
-                    ProgressView("AI正在分析图片...")
-                        .padding()
-                        .background(Color.white)
-                        .cornerRadius(10)
-                        .shadow(radius: 10)
+                    loadingOverlay
                 }
             }
-            .navigationTitle("我的收藏夹")
+            .navigationTitle("收藏夹")
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button(action: { showImagePicker = true }) {
-                            Label("上传图片", systemImage: "photo.on.rectangle.angled")
+                            Label("上传图片", systemImage: "photo.badge.plus")
                         }
-
                         Button(action: { showCreateAlbum = true }) {
                             Label("新建收藏夹", systemImage: "folder.badge.plus")
                         }
                     } label: {
                         Image(systemName: "plus.circle.fill")
-                            .font(.title2)
+                            .font(.title3)
+                            .symbolRenderingMode(.hierarchical)
                     }
                 }
             }
@@ -63,42 +56,58 @@ struct HomeView: View {
     }
 
     private var emptyStateView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "photo.on.rectangle.angled")
-                .font(.system(size: 80))
-                .foregroundColor(.gray)
-
-            Text("暂无收藏夹")
-                .font(.title2)
-                .foregroundColor(.gray)
-
-            Text("上传图片,AI将自动创建分类")
-                .font(.subheadline)
-                .foregroundColor(.gray)
-                .multilineTextAlignment(.center)
-
+        ContentUnavailableView {
+            Label("暂无收藏夹", systemImage: "photo.on.rectangle.angled")
+        } description: {
+            Text("上传图片，AI 将自动创建分类")
+        } actions: {
             Button(action: { showImagePicker = true }) {
-                Label("上传图片", systemImage: "plus.circle.fill")
-                    .font(.headline)
-                    .padding()
-                    .background(Color.appPrimary)
-                    .foregroundColor(.white)
-                    .cornerRadius(10)
+                Text("上传图片")
+                    .fontWeight(.semibold)
             }
+            .buttonStyle(.borderedProminent)
+            .tint(.appPrimary)
         }
-        .padding()
     }
 
     private var albumGridView: some View {
         ScrollView {
-            LazyVGrid(columns: columns, spacing: 15) {
+            LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(viewModel.albums) { album in
-                    NavigationLink(destination: AlbumDetailView(album: album, onUpdate: viewModel.updateAlbum)) {
+                    NavigationLink(value: album) {
                         AlbumGridCell(album: album, viewModel: viewModel)
+                    }
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            viewModel.deleteAlbum(album)
+                        } label: {
+                            Label("删除收藏夹", systemImage: "trash")
+                        }
                     }
                 }
             }
-            .padding()
+            .padding(.horizontal)
+            .padding(.top, 4)
+        }
+        .navigationDestination(for: Album.self) { album in
+            AlbumDetailView(album: album, onUpdate: viewModel.updateAlbum)
+        }
+    }
+
+    private var loadingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.35)
+                .ignoresSafeArea()
+
+            VStack(spacing: 16) {
+                ProgressView()
+                    .controlSize(.large)
+                Text("AI 正在分析图片...")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+            }
+            .padding(28)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
         }
     }
 
@@ -116,14 +125,15 @@ struct AlbumGridCell: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Cover Image
             ZStack {
-                Rectangle()
-                    .fill(LinearGradient(
-                        colors: [Color.appPrimary.opacity(0.6), Color.appSecondary.opacity(0.6)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.appPrimary.opacity(0.5), Color.appSecondary.opacity(0.5)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .aspectRatio(1, contentMode: .fit)
 
                 if let coverPhotoID = album.coverPhotoID,
@@ -134,11 +144,11 @@ struct AlbumGridCell: View {
                         .aspectRatio(contentMode: .fill)
                         .frame(maxWidth: .infinity)
                         .aspectRatio(1, contentMode: .fit)
-                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
                 } else {
                     Image(systemName: "photo.stack")
-                        .font(.system(size: 40))
-                        .foregroundColor(.white)
+                        .font(.system(size: 36))
+                        .foregroundStyle(.white.opacity(0.9))
                 }
 
                 if album.isEncrypted {
@@ -146,10 +156,10 @@ struct AlbumGridCell: View {
                         HStack {
                             Spacer()
                             Image(systemName: "lock.fill")
-                                .font(.caption)
-                                .foregroundColor(.white)
-                                .padding(6)
-                                .background(Color.black.opacity(0.5))
+                                .font(.caption2)
+                                .foregroundStyle(.white)
+                                .padding(5)
+                                .background(.ultraThinMaterial)
                                 .clipShape(Circle())
                                 .padding(8)
                         }
@@ -157,19 +167,20 @@ struct AlbumGridCell: View {
                     }
                 }
             }
-            .cornerRadius(12)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
 
-            // Album Info
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(album.name)
-                    .font(.headline)
-                    .foregroundColor(.primary)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
 
                 Text("\(viewModel.getAlbumPhotos(album).count) 张照片")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
+            .padding(.horizontal, 2)
         }
     }
 }
