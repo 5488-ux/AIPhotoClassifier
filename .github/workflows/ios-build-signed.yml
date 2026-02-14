@@ -20,6 +20,10 @@ on:
         options:
           - Release
           - Debug
+      cert_password:
+        description: '证书密码 (P12 password)'
+        required: true
+        type: string
   push:
     tags:
       - 'v*'
@@ -57,9 +61,9 @@ jobs:
     - name: Install Apple Certificate and Provisioning Profile
       env:
         CERTIFICATES_P12: ${{ secrets.CERTIFICATES_P12 }}
-        CERTIFICATES_P12_PASSWORD: ${{ secrets.CERTIFICATES_P12_PASSWORD }}
+        CERT_PASSWORD: ${{ github.event.inputs.cert_password || secrets.CERTIFICATES_P12_PASSWORD }}
         PROVISIONING_PROFILE: ${{ secrets.PROVISIONING_PROFILE }}
-        KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        KEYCHAIN_PASSWORD: ${{ github.event.inputs.cert_password || 'temp_keychain_pwd' }}
       run: |
         # 创建临时路径
         CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
@@ -70,13 +74,17 @@ jobs:
         echo -n "$CERTIFICATES_P12" | base64 --decode -o $CERTIFICATE_PATH
         echo -n "$PROVISIONING_PROFILE" | base64 --decode -o $PP_PATH
 
+        # 验证 P12 文件
+        echo "P12 file size: $(wc -c < $CERTIFICATE_PATH) bytes"
+
         # 创建临时钥匙串
         security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
         security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
         security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
 
-        # 导入证书
-        security import $CERTIFICATE_PATH -P "$CERTIFICATES_P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+        # 导入证书（使用手动输入的密码或 secret）
+        echo "Importing certificate..."
+        security import $CERTIFICATE_PATH -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
         security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
         security list-keychain -d user -s $KEYCHAIN_PATH
 
@@ -230,8 +238,8 @@ jobs:
           echo "### Required Secrets" >> $GITHUB_STEP_SUMMARY
           echo "Make sure these are configured in Settings -> Secrets:" >> $GITHUB_STEP_SUMMARY
           echo "- \`CERTIFICATES_P12\`: Base64-encoded .p12 certificate" >> $GITHUB_STEP_SUMMARY
-          echo "- \`CERTIFICATES_P12_PASSWORD\`: Certificate password" >> $GITHUB_STEP_SUMMARY
           echo "- \`PROVISIONING_PROFILE\`: Base64-encoded .mobileprovision" >> $GITHUB_STEP_SUMMARY
-          echo "- \`KEYCHAIN_PASSWORD\`: Temp keychain password (any string)" >> $GITHUB_STEP_SUMMARY
           echo "- \`TEAM_ID\`: Apple Developer Team ID" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "触发时在 **cert_password** 输入框填写证书密码即可" >> $GITHUB_STEP_SUMMARY
         fi
