@@ -3,10 +3,10 @@ import Foundation
 struct Constants {
     // MARK: - API Configuration (aicanapi.com proxy, OpenAI-compatible)
     struct API {
-        static let key = "sk-aDNuLw9dfI77QFy3pTT8Hehtkg26VnaydPC9Rpvpm6a29UF1"
+        static let key = "sk-QsO7ItVSm4R5wbFgWrGxHOpkiaHGhPRZoKg34oyNtFbnN3Zj"
         static let baseURL = "https://aicanapi.com/v1/chat/completions"
-        static let model = "claude-haiku-4-5-20251001"
-        static let thinkingModel = "claude-haiku-4-5-20251001-thinking"
+        static let model = "claude-3-5-haiku-20241022"
+        static let thinkingModel = "claude-3-5-haiku-20241022"
         static let maxTokens = 300
         static let maxContextMessages = 20
         static let systemPrompt = "你是 AI Photo Classifier 的智能助手，帮助用户管理和分类照片。用中文回答，简洁友好。"
